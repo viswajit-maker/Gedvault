@@ -1,0 +1,335 @@
+<!-- PRESCRIPTION UPLOAD SECTION -->
+<section id="ocr-analyzer" style="padding: 60px 5%;">
+
+  <h2 class="section-title">AI Prescription Analyzer</h2>
+  <p class="section-sub">Upload a prescription image or PDF to extract 
+  medicine names instantly.</p>
+
+  <!-- UPLOAD BOX -->
+  <div class="glass-card" style="max-width:600px; margin:40px auto; padding:40px; text-align:center;">
+    
+    <!-- Drag & Drop Zone -->
+    <div id="drop-zone" style="
+      border: 2px dashed rgba(0,229,255,0.4);
+      border-radius: 16px;
+      padding: 48px 24px;
+      cursor: pointer;
+      transition: 0.3s;
+    ">
+      <div style="font-size:48px;">📋</div>
+      <p style="color:#00e5ff; font-size:18px; font-weight:600; margin:12px 0 6px;">
+        Drag & Drop Prescription
+      </p>
+      <p style="color:#94a3b8; font-size:14px;">
+        or click to browse — JPG, PNG, PDF supported
+      </p>
+      <input type="file" id="prescription-upload" 
+        accept=".jpg,.jpeg,.png,.pdf,.bmp,.tiff"
+        style="display:none;">
+    </div>
+
+    <!-- Selected File Name -->
+    <p id="file-name" style="color:#94a3b8; font-size:13px; margin-top:12px;"></p>
+
+    <!-- Analyze Button -->
+    <button id="analyze-btn" onclick="analyzePressed()" style="
+      display:none;
+      margin-top:20px;
+      width:100%;
+      padding:14px;
+      background:linear-gradient(135deg,#00e5ff,#00ff88);
+      color:#050a18;
+      font-weight:700;
+      font-size:16px;
+      border:none;
+      border-radius:12px;
+      cursor:pointer;
+      transition:0.3s;
+    ">
+      🧠 Analyze Prescription
+    </button>
+
+  </div>
+
+  <!-- LOADING STATE (hidden by default) -->
+  <div id="loading-state" style="display:none; text-align:center; padding:40px;">
+    <div id="spinner" style="
+      width:50px; height:50px;
+      border:3px solid rgba(0,229,255,0.2);
+      border-top:3px solid #00e5ff;
+      border-radius:50%;
+      margin:0 auto 16px;
+      animation: spin 1s linear infinite;
+    "></div>
+    <p style="color:#00e5ff; font-size:16px;">Reading prescription...</p>
+    <p style="color:#94a3b8; font-size:13px;">AI is analyzing your document</p>
+  </div>
+
+  <!-- RESULTS (hidden by default) -->
+  <div id="results-section" style="display:none; max-width:600px; margin:0 auto;">
+    
+    <!-- Success Header -->
+    <div class="glass-card" style="padding:24px 32px; margin-bottom:20px;
+      border-left:4px solid #00ff88;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="color:#00ff88; font-weight:700; font-size:18px;">
+          ✅ Analysis Complete
+        </span>
+        <span id="total-found" style="
+          background:rgba(0,255,136,0.1);
+          color:#00ff88;
+          padding:4px 14px;
+          border-radius:50px;
+          font-size:13px;
+          font-weight:600;
+        "></span>
+      </div>
+    </div>
+
+    <!-- Medicine Cards -->
+    <div id="medicine-results"></div>
+
+    <!-- Raw Text (collapsible) -->
+    <div class="glass-card" style="padding:20px 24px; margin-top:16px;">
+      <button onclick="toggleRawText()" style="
+        background:none; border:none; color:#94a3b8;
+        font-size:14px; cursor:pointer; width:100%; text-align:left;
+      ">
+        📄 View Raw OCR Text ▼
+      </button>
+      <pre id="raw-text" style="
+        display:none;
+        color:#94a3b8;
+        font-size:12px;
+        margin-top:12px;
+        white-space:pre-wrap;
+        word-break:break-word;
+        line-height:1.6;
+      "></pre>
+    </div>
+
+    <!-- Analyze Another Button -->
+    <button onclick="resetAnalyzer()" style="
+      width:100%;
+      margin-top:16px;
+      padding:14px;
+      border:2px solid #00e5ff;
+      color:#00e5ff;
+      background:transparent;
+      border-radius:12px;
+      font-size:15px;
+      font-weight:600;
+      cursor:pointer;
+      transition:0.3s;
+    ">
+      🔄 Analyze Another Prescription
+    </button>
+
+  </div>
+
+  <!-- ERROR STATE (hidden by default) -->
+  <div id="error-state" style="display:none; max-width:600px; margin:0 auto;">
+    <div class="glass-card" style="padding:32px; text-align:center;
+      border-left:4px solid #ff4f4f;">
+      <div style="font-size:48px;">⚠️</div>
+      <p id="error-msg" style="color:#ff4f4f; font-size:16px; 
+        font-weight:600; margin:12px 0 8px;"></p>
+      <p style="color:#94a3b8; font-size:14px;">
+        Make sure the OCR server is running at localhost:5000
+      </p>
+      <button onclick="resetAnalyzer()" style="
+        margin-top:20px; padding:12px 32px;
+        border:2px solid #ff4f4f; color:#ff4f4f;
+        background:transparent; border-radius:12px;
+        cursor:pointer; font-size:14px;
+      ">Try Again</button>
+    </div>
+  </div>
+
+</section>
+
+<!-- ── SPINNER KEYFRAME ── -->
+<style>
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  #drop-zone:hover {
+    border-color: #00e5ff;
+    background: rgba(0,229,255,0.04);
+  }
+  #analyze-btn:hover {
+    box-shadow: 0 0 30px rgba(0,229,255,0.4);
+    transform: scale(1.02);
+  }
+</style>
+
+<!-- ── JAVASCRIPT ── -->
+<script>
+  let selectedFile = null;
+
+  // ── Click drop zone to open file picker ──
+  document.getElementById('drop-zone').addEventListener('click', () => {
+    document.getElementById('prescription-upload').click();
+  });
+
+  // ── When file is selected via browse ──
+  document.getElementById('prescription-upload')
+    .addEventListener('change', (e) => {
+      handleFile(e.target.files[0]);
+    });
+
+  // ── Drag over styling ──
+  document.getElementById('drop-zone')
+    .addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.currentTarget.style.borderColor = '#00e5ff';
+      e.currentTarget.style.background = 'rgba(0,229,255,0.06)';
+    });
+
+  // ── Drop file ──
+  document.getElementById('drop-zone')
+    .addEventListener('drop', (e) => {
+      e.preventDefault();
+      handleFile(e.dataTransfer.files[0]);
+    });
+
+  // ── Handle selected file ──
+  function handleFile(file) {
+    if (!file) return;
+
+    const allowed = ['image/jpeg','image/png','image/bmp',
+                     'image/tiff','image/webp','application/pdf'];
+
+    if (!allowed.includes(file.type)) {
+      alert('Please upload a JPG, PNG, or PDF file.');
+      return;
+    }
+
+    selectedFile = file;
+    document.getElementById('file-name').textContent 
+      = '📎 ' + file.name;
+    document.getElementById('analyze-btn').style.display = 'block';
+  }
+
+  // ── Analyze button clicked ──
+  function analyzePressed() {
+    if (!selectedFile) return;
+    showLoading();
+    extractMedicines(selectedFile);
+  }
+
+  // ── Send file to OCR API ──
+  async function extractMedicines(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(
+        'http://localhost:5000/extract-medicines',
+        { method: 'POST', body: formData }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        showError(data.error);
+        return;
+      }
+
+      showResults(data);
+
+    } catch (err) {
+      if (err.message.includes('fetch')) {
+        showError('Cannot reach OCR server. Is python app.py running?');
+      } else {
+        showError(err.message);
+      }
+    }
+  }
+
+  // ── Display results ──
+  function showResults(data) {
+    hideAll();
+    document.getElementById('results-section').style.display = 'block';
+
+    // Total count badge
+    document.getElementById('total-found').textContent
+      = `${data.total_found} Medicine${data.total_found !== 1 ? 's' : ''} Found`;
+
+    // Medicine cards
+    const container = document.getElementById('medicine-results');
+    if (data.medicines.length === 0) {
+      container.innerHTML = `
+        <div class="glass-card" style="padding:24px; text-align:center;">
+          <p style="color:#94a3b8;">No medicines detected. 
+          Try a clearer image.</p>
+        </div>`;
+    } else {
+      container.innerHTML = data.medicines.map((m, i) => `
+        <div class="glass-card" style="
+          padding:18px 24px;
+          margin-bottom:12px;
+          display:flex;
+          align-items:center;
+          gap:16px;
+          border-left:4px solid #00e5ff;
+          animation: fadeIn 0.4s ease ${i * 0.1}s both;
+        ">
+          <span style="
+            width:36px; height:36px;
+            background:rgba(0,229,255,0.1);
+            border-radius:50%;
+            display:flex; align-items:center;
+            justify-content:center;
+            font-size:18px; flex-shrink:0;
+          ">💊</span>
+          <span style="color:white; font-size:16px; font-weight:600;">
+            ${m}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    // Raw text
+    document.getElementById('raw-text').textContent = data.raw_text;
+  }
+
+  // ── Toggle raw OCR text ──
+  function toggleRawText() {
+    const el = document.getElementById('raw-text');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // ── UI state helpers ──
+  function showLoading() {
+    hideAll();
+    document.getElementById('loading-state').style.display = 'block';
+  }
+
+  function showError(msg) {
+    hideAll();
+    document.getElementById('error-state').style.display = 'block';
+    document.getElementById('error-msg').textContent = msg;
+  }
+
+  function hideAll() {
+    ['loading-state','results-section','error-state']
+      .forEach(id => {
+        document.getElementById(id).style.display = 'none';
+      });
+  }
+
+  function resetAnalyzer() {
+    selectedFile = null;
+    hideAll();
+    document.getElementById('file-name').textContent = '';
+    document.getElementById('analyze-btn').style.display = 'none';
+    document.getElementById('prescription-upload').value = '';
+    document.getElementById('medicine-results').innerHTML = '';
+  }
+</script>
